@@ -123,7 +123,7 @@ app.get("/api/v1/logs", async (req, res) => {
     const search = req.query.search as string;
     const startTime = req.query.startTime as string;
     const endTime = req.query.endTime as string;
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 30;
     const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
 
     const filters = { appId, level, traceId, search, startTime, endTime };
