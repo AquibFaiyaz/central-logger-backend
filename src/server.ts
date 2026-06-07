@@ -4,7 +4,7 @@ import crypto from "crypto";
 import winston from "winston";
 import dotenv from "dotenv";
 import { z } from "zod";
-import { insertLogEntry, getRegisteredApps, queryLogEntries, countLogEntries, initializeDatabaseSchema, LogEntryInput } from "./db.js";
+import { insertLogEntry, getRegisteredApps, queryLogEntries, countLogEntries, initializeDatabaseSchema, deleteOldLogs, LogEntryInput } from "./db.js";
 
 dotenv.config();
 
@@ -162,9 +162,39 @@ app.get("/api/v1/logs/stream", (req, res) => {
   });
 });
 
+const RETENTION_HOURS = 6;
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // run every hour
+
+function startRetentionCleanup() {
+  logger.info(`Retention cleanup scheduler started: logs older than ${RETENTION_HOURS} hours will be purged every hour.`);
+  
+  setInterval(async () => {
+    try {
+      const deletedCount = await deleteOldLogs(RETENTION_HOURS);
+      if (deletedCount > 0) {
+        logger.info(`[Retention Cleanup] Purged ${deletedCount} logs older than ${RETENTION_HOURS} hours.`);
+      }
+    } catch (err: any) {
+      logger.error(`[Retention Cleanup] Failed to run log retention purge: ${err.message}`);
+    }
+  }, CLEANUP_INTERVAL_MS);
+}
+
 async function startServer() {
   try {
     await initializeDatabaseSchema();
+
+    // Run initial cleanup on boot
+    try {
+      const deletedCount = await deleteOldLogs(RETENTION_HOURS);
+      logger.info(`[Retention Cleanup] Initial boot purge completed. Deleted ${deletedCount} old logs.`);
+    } catch (cleanupErr: any) {
+      logger.error(`[Retention Cleanup] Initial boot purge failed: ${cleanupErr.message}`);
+    }
+
+    // Start background scheduler
+    startRetentionCleanup();
+
     app.listen(port, () => {
       logger.info(`Central Logger Backend running at http://localhost:${port}`);
     });

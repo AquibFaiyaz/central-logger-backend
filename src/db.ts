@@ -212,6 +212,13 @@ export async function countLogEntries(filters: QueryFilters): Promise<number> {
   return parseInt(result.rows[0].total, 10);
 }
 
+export async function deleteOldLogs(retentionHours: number): Promise<number> {
+  const cutoff = new Date(Date.now() - retentionHours * 60 * 60 * 1000);
+  const query = "DELETE FROM logs WHERE timestamp < $1";
+  const result = await pool.query(query, [cutoff]);
+  return result.rowCount || 0;
+}
+
 export async function closeDatabase(): Promise<void> {
   await pool.end();
 }
