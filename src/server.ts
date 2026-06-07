@@ -4,7 +4,7 @@ import crypto from "crypto";
 import winston from "winston";
 import dotenv from "dotenv";
 import { z } from "zod";
-import { insertLogEntry, getRegisteredApps, queryLogEntries, initializeDatabaseSchema, LogEntryInput } from "./db.js";
+import { insertLogEntry, getRegisteredApps, queryLogEntries, countLogEntries, initializeDatabaseSchema, LogEntryInput } from "./db.js";
 
 dotenv.config();
 
@@ -121,19 +121,19 @@ app.get("/api/v1/logs", async (req, res) => {
     const level = req.query.level as string;
     const traceId = req.query.traceId as string;
     const search = req.query.search as string;
+    const startTime = req.query.startTime as string;
+    const endTime = req.query.endTime as string;
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
 
-    const logs = await queryLogEntries({
-      appId,
-      level,
-      traceId,
-      search,
-      limit,
-      offset,
-    });
+    const filters = { appId, level, traceId, search, startTime, endTime };
 
-    res.json({ success: true, logs });
+    const [logs, total] = await Promise.all([
+      queryLogEntries({ ...filters, limit, offset }),
+      countLogEntries(filters),
+    ]);
+
+    res.json({ success: true, logs, total });
   } catch (err: any) {
     logger.error(`Query logs failed: ${err.message}`);
     res.status(500).json({ success: false, error: err.message });
