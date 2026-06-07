@@ -1,0 +1,54 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH and Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /var/www/central-logger-backend
+            
+            # Initialize git if not already present
+            if [ ! -d ".git" ]; then
+              echo "Initializing git repository..."
+              git init
+              git remote add origin https://github.com/AquibFaiyaz/central-logger-backend.git
+            fi
+            
+            echo "Fetching latest changes..."
+            git fetch --all
+            git checkout -f main
+            git pull origin main
+            
+            # Build the Docker image
+            echo "Building Docker image..."
+            docker build -t central-logger-backend .
+            
+            # Stop and remove the old container if it exists
+            echo "Stopping old container..."
+            docker stop central-logger-backend || true
+            docker rm central-logger-backend || true
+            
+            # Start the new Docker container
+            echo "Starting new container..."
+            docker run -d \
+              --name central-logger-backend \
+              --restart unless-stopped \
+              -p 4000:4000 \
+              --env-file /var/www/central-logger-backend/.env \
+              central-logger-backend
+            
+            # Clean up dangling images to save disk space
+            echo "Cleaning up old images..."
+            docker image prune -f
