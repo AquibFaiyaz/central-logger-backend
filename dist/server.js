@@ -4,7 +4,7 @@ import crypto from "crypto";
 import winston from "winston";
 import dotenv from "dotenv";
 import { z } from "zod";
-import { insertLogEntry, getRegisteredApps, queryLogEntries, initializeDatabaseSchema } from "./db.js";
+import { insertLogEntry, getRegisteredApps, queryLogEntries, countLogEntries, initializeDatabaseSchema } from "./db.js";
 dotenv.config();
 // Setup internal winston logger for backend self-logs
 const logger = winston.createLogger({
@@ -99,17 +99,16 @@ app.get("/api/v1/logs", async (req, res) => {
         const level = req.query.level;
         const traceId = req.query.traceId;
         const search = req.query.search;
-        const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+        const startTime = req.query.startTime;
+        const endTime = req.query.endTime;
+        const limit = req.query.limit ? parseInt(req.query.limit) : 30;
         const offset = req.query.offset ? parseInt(req.query.offset) : 0;
-        const logs = await queryLogEntries({
-            appId,
-            level,
-            traceId,
-            search,
-            limit,
-            offset,
-        });
-        res.json({ success: true, logs });
+        const filters = { appId, level, traceId, search, startTime, endTime };
+        const [logs, total] = await Promise.all([
+            queryLogEntries({ ...filters, limit, offset }),
+            countLogEntries(filters),
+        ]);
+        res.json({ success: true, logs, total });
     }
     catch (err) {
         logger.error(`Query logs failed: ${err.message}`);

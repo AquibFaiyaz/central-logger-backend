@@ -91,6 +91,16 @@ export async function queryLogEntries(filters) {
         params.push(wildcardSearch);
         paramCounter++;
     }
+    if (filters.startTime) {
+        query += ` AND timestamp >= $${paramCounter}`;
+        params.push(filters.startTime);
+        paramCounter++;
+    }
+    if (filters.endTime) {
+        query += ` AND timestamp <= $${paramCounter}`;
+        params.push(filters.endTime);
+        paramCounter++;
+    }
     query += " ORDER BY timestamp DESC";
     if (filters.limit !== undefined) {
         query += ` LIMIT $${paramCounter}`;
@@ -113,6 +123,44 @@ export async function queryLogEntries(filters) {
         timestamp: row.timestamp,
         payload: row.payload, // pg driver automatically parses JSONB as objects
     }));
+}
+export async function countLogEntries(filters) {
+    let query = "SELECT COUNT(*) as total FROM logs WHERE 1=1";
+    const params = [];
+    let paramCounter = 1;
+    if (filters.appId) {
+        query += ` AND app_id = $${paramCounter}`;
+        params.push(filters.appId);
+        paramCounter++;
+    }
+    if (filters.level) {
+        query += ` AND level = $${paramCounter}`;
+        params.push(filters.level);
+        paramCounter++;
+    }
+    if (filters.traceId) {
+        query += ` AND trace_id = $${paramCounter}`;
+        params.push(filters.traceId);
+        paramCounter++;
+    }
+    if (filters.search) {
+        query += ` AND (message ILIKE $${paramCounter} OR payload::text ILIKE $${paramCounter})`;
+        const wildcardSearch = `%${filters.search}%`;
+        params.push(wildcardSearch);
+        paramCounter++;
+    }
+    if (filters.startTime) {
+        query += ` AND timestamp >= $${paramCounter}`;
+        params.push(filters.startTime);
+        paramCounter++;
+    }
+    if (filters.endTime) {
+        query += ` AND timestamp <= $${paramCounter}`;
+        params.push(filters.endTime);
+        paramCounter++;
+    }
+    const result = await pool.query(query, params);
+    return parseInt(result.rows[0].total, 10);
 }
 export async function closeDatabase() {
     await pool.end();
